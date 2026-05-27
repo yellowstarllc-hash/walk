@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Yellow Star Daily Walk</title>
+<style>
+  :root {
+    --navy: #1f3a5f;
+    --gold: #d9a300;
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --text: #0f1d31;
+    --muted: #6b7280;
+    --good: #16a34a;
+    --warn: #b91c1c;
+    --line: #e5e7eb;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100%; overflow: hidden;
+    user-select: none;
+  }
+  .app { height: 100vh; display: flex; flex-direction: column; }
+  header {
+    background: var(--navy); color: #fff;
+    padding: 14px 16px 10px;
+  }
+  header .title { font-weight: 700; font-size: 16px; letter-spacing: 0.5px; }
+  header .sub { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+  .progress-wrap { height: 6px; background: rgba(255,255,255,0.18); border-radius: 4px; margin-top: 10px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--gold); width: 0%; transition: width 0.25s ease; }
+  main {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
+    display: flex; flex-direction: column;
+    -webkit-overflow-scrolling: touch;
+  }
+  .screen { display: none; flex-direction: column; gap: 14px; }
+  .screen.active { display: flex; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 18px;
+    box-shadow: 0 1px 3px rgba(15, 29, 49, 0.06);
+  }
+  h1 { font-size: 22px; margin: 0 0 10px; color: var(--navy); }
+  h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  input[type="text"], input[type="date"] {
+    width: 100%; font-size: 17px; padding: 14px 12px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: #fff; color: var(--text);
+    -webkit-appearance: none;
+  }
+  input:focus { outline: none; border-color: var(--navy); }
+
+  /* Room screen */
+  .pill {
+    display: inline-block; background: var(--gold); color: #fff;
+    padding: 4px 10px; border-radius: 999px; font-size: 11px;
+    font-weight: 700; letter-spacing: 0.5px;
+  }
+  .pill.flower { background: #16a34a; }
+  .pill.veg { background: #2563eb; }
+  .pill.prop { background: #9333ea; }
+  .pill.dry { background: #b45309; }
+  .room-name {
+    font-size: 48px; font-weight: 800; color: var(--navy);
+    text-align: center; letter-spacing: 1px; margin: 10px 0 0;
+  }
+  .room-sub { text-align: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .tag-input {
+    font-size: 32px !important; text-align: center; letter-spacing: 4px;
+    padding: 16px !important; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .tag-input::placeholder { color: #cbd5e1; letter-spacing: 3px; font-weight: 500; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 18px; border-radius: 12px;
+    font-size: 18px; font-weight: 700; border: none;
+    cursor: pointer; transition: transform 0.08s ease, opacity 0.15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-harvest { background: #b45309; color: #fff; }
+  .btn-photo   { background: #2563eb; color: #fff; }
+  .btn-empty   { background: #475569; color: #fff; }
+  .btn-issue   { background: #fff; color: var(--warn); border: 2px solid var(--warn); }
+  .btn-back    { background: transparent; color: var(--muted); padding: 10px; font-size: 14px; font-weight: 500; }
+  .btn-send    { background: var(--gold); color: #fff; }
+  .btn-ghost   { background: #fff; color: var(--navy); border: 1px solid var(--line); }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  /* Chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 10px 14px; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+  }
+  .chip.active { background: var(--warn); color: #fff; border-color: var(--warn); }
+
+  /* Summary */
+  .summary-list { list-style: none; padding: 0; margin: 0; }
+  .summary-list li {
+    padding: 10px 0; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; font-size: 14px;
+  }
+  .summary-list .room-label { font-weight: 600; }
+  .summary-list .val { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .summary-list .val.issue { color: var(--warn); font-weight: 600; }
+  .summary-list .val.empty { color: #475569; font-weight: 600; }
+  .summary-list .val.harvest { color: #b45309; font-weight: 600; }
+  .summary-list li.has-photo { flex-direction: column; align-items: stretch; gap: 6px; }
+  .summary-list .photo-row { display: flex; justify-content: space-between; }
+  .summary-list .photo-thumb {
+    width: 100%; max-height: 180px; object-fit: cover;
+    border-radius: 8px; border: 1px solid var(--line);
+    margin-top: 4px;
+  }
+
+  /* Sanitation checks */
+  .check-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .check-row:last-child { border-bottom: none; }
+  .check-row .box {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 2px solid var(--line); background: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: transparent; flex-shrink: 0;
+  }
+  .check-row.checked .box { background: var(--good); border-color: var(--good); color: #fff; }
+  .check-row .label { font-size: 15px; flex: 1; }
+
+  .dry-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+  }
+  .dry-row:last-child { border-bottom: none; }
+  .dry-row .name { width: 56px; font-weight: 600; font-size: 14px; color: var(--text); flex-shrink: 0; }
+  .dry-row input {
+    flex: 1; font-size: 16px; padding: 10px 8px;
+    border: 1px solid var(--line); border-radius: 8px;
+    text-align: center; letter-spacing: 2px;
+    -webkit-appearance: none; min-width: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .dry-row input:disabled { background: #f1f5f9; color: #94a3b8; }
+  .dry-row .empty-toggle {
+    background: #fff; border: 1px solid var(--line);
+    color: var(--text); padding: 8px 10px; border-radius: 8px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .dry-row.is-empty .empty-toggle { background: #475569; color: #fff; border-color: #475569; }
+  .waste-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 18px;
+  }
+  .stepper {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: none; background: var(--navy); color: #fff;
+    font-size: 36px; font-weight: 700; line-height: 1;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .stepper:active { transform: scale(0.94); }
+  .stepper:disabled { background: #cbd5e1; }
+  .bag-count { text-align: center; }
+  .bag-num {
+    font-size: 64px; font-weight: 800; color: var(--navy);
+    line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .bag-label {
+    color: var(--muted); font-size: 13px; text-transform: uppercase;
+    letter-spacing: 1px; margin-top: 4px;
+  }
+  .jump-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .jump-bar label {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin: 0; font-weight: 600; flex-shrink: 0;
+  }
+  .jump-bar select {
+    flex: 1; font-size: 16px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    -webkit-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%231f3a5f' d='M0 0l6 8 6-8z'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 28px;
+  }
+  footer {
+    padding: 12px 16px; background: #fff; border-top: 1px solid var(--line);
+    display: flex; gap: 8px;
+  }
+  footer .btn-back { flex: 0 0 auto; }
+  footer .info { flex: 1; text-align: right; font-size: 12px; color: var(--muted); align-self: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="title">YELLOW STAR — DAILY WALK</div>
+    <div class="sub">License GAAI-QI5G-DEQQ</div>
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  </header>
+
+  <main>
+    <!-- PIN SCREEN -->
+    <section class="screen active" id="screen-pin">
+      <div class="card" style="text-align:center;">
+        <h1 style="margin:0 0 6px;">Enter PIN</h1>
+        <p style="margin:0 0 16px; color:var(--muted); font-size:13px;">4-digit code to open the walk log.</p>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+               class="tag-input" id="inputPin" placeholder="••••" autocomplete="off" />
+        <div id="pinError" style="display:none; color:var(--warn); font-size:13px; margin-top:8px; font-weight:600;">Wrong PIN — try again</div>
+      </div>
+      <button class="btn btn-primary" id="btnPin">UNLOCK</button>
+    </section>
+
+    <!-- START SCREEN -->
+    <section class="screen" id="screen-start">
+      <div class="card">
+        <h1>Start today's walk</h1>
+        <label>Date</label>
+        <input type="date" id="inputDate" />
+        <div style="height:14px"></div>
+        <label>Initials</label>
+        <input type="text" id="inputInitials" value="JB" maxlength="4" autocapitalize="characters" />
+      </div>
+      <button class="btn btn-primary" id="btnStart">START WALK</button>
+      <button class="btn btn-ghost" id="btnResume" style="display:none">RESUME UNFINISHED WALK</button>
+    </section>
+
+    <!-- ROOM SCREEN (one per room, rendered dynamically) -->
+    <section class="screen" id="screen-room">
+      <div class="jump-bar">
+        <label for="roomJump">JUMP TO ROOM</label>
+        <select id="roomJump"></select>
+      </div>
+      <div>
+        <span class="pill" id="roomPill">FLOWER</span>
+      </div>
+      <div class="room-name" id="roomName">A1</div>
+      <div class="room-sub" id="roomSub">Pull one tag — enter the last 6 digits</div>
+
+      <div class="card" id="tagCard">
+        <label>Last 6 of pulled tag</label>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+               class="tag-input" id="inputTag" placeholder="000000" />
+      </div>
+
+      <div id="photoPreview" style="display:none; text-align:center;">
+        <img id="photoThumb" style="max-width:60%; max-height:160px; border-radius:10px; border:2px solid var(--good);" />
+        <div style="color:var(--good); font-weight:600; font-size:13px; margin-top:6px;">✓ Photo captured</div>
+      </div>
+
+      <button class="btn btn-primary" id="btnNext">NEXT →</button>
+      <button class="btn btn-primary" id="btnOk" style="display:none">OK — LOOKS GOOD</button>
+      <button class="btn btn-photo" id="btnPhoto" style="display:none">📷 UPLOAD IMAGE</button>
+      <input type="file" id="inputImage" accept="image/*" capture="environment" style="display:none" />
+      <button class="btn btn-harvest" id="btnHarvested" style="display:none">HARVESTED</button>
+      <button class="btn btn-empty" id="btnEmpty">ROOM IS EMPTY</button>
+      <button class="btn btn-issue" id="btnIssue">FLAG AN ISSUE</button>
+    </section>
+
+    <!-- ISSUE PICKER -->
+    <section class="screen" id="screen-issue">
+      <div class="card">
+        <h1 id="issueRoom">A1 — flag issue</h1>
+        <p style="margin:0 0 14px; color:var(--muted); font-size:14px;">Tap the issue. You can pick more than one.</p>
+        <div class="chips" id="issueChips">
+          <div class="chip" data-issue="tag mismatch">Tag mismatch vs door</div>
+          <div class="chip" data-issue="door blank">Door whiteboard blank</div>
+          <div class="chip" data-issue="pests">Pests</div>
+          <div class="chip" data-issue="irrigation">Irrigation issue</div>
+          <div class="chip" data-issue="debris">Debris on floor</div>
+          <div class="chip" data-issue="light/temp">Light or temp off</div>
+          <div class="chip" data-issue="needs RFID scan">Needs RFID scan</div>
+          <div class="chip" data-issue="other">Other</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnSaveIssue">SAVE & CONTINUE</button>
+      <button class="btn btn-back" id="btnCancelIssue">Cancel</button>
+    </section>
+
+    <!-- DRY ROOMS SCREEN (consolidated) -->
+    <section class="screen" id="screen-dry">
+      <div><span class="pill dry">DRY</span></div>
+      <h1 style="margin:0">Dry rooms</h1>
+      <p style="margin:0; color:var(--muted); font-size:14px;">For each, enter the last 6 of one package tag — or tap Empty.</p>
+      <div class="card" id="dryList"></div>
+      <button class="btn btn-primary" id="btnDryNext">NEXT →</button>
+    </section>
+
+    <!-- SANITATION SCREEN -->
+    <section class="screen" id="screen-sanitation">
+      <h1 style="margin:0">Sanitation & safety</h1>
+      <p style="margin:0; color:var(--muted); font-size:14px;">Tap each to confirm OK.</p>
+      <div class="card" id="sanitationList">
+        <div class="check-row" data-key="floors"><div class="box">✓</div><div class="label">Floors swept / debris removed</div></div>
+        <div class="check-row" data-key="doors"><div class="box">✓</div><div class="label">Flower room doors closed & locked</div></div>
+        <div class="check-row" data-key="dry"><div class="box">✓</div><div class="label">Drying room temp/RH within target</div></div>
+        <div class="check-row" data-key="irrig"><div class="box">✓</div><div class="label">Irrigation lines OK</div></div>
+      </div>
+      <button class="btn btn-primary" id="btnToWaste">NEXT →</button>
+    </section>
+
+    <!-- WASTE SCREEN -->
+    <section class="screen" id="screen-waste">
+      <h1 style="margin:0">Non-MMJ waste</h1>
+      <p style="margin:0; color:var(--muted); font-size:14px;">How many bags of veg-pruning / stalk waste went out today?</p>
+      <div class="card waste-card">
+        <button class="stepper" id="bagsMinus" aria-label="decrease">−</button>
+        <div class="bag-count">
+          <div class="bag-num" id="bagNum">0</div>
+          <div class="bag-label">bags</div>
+        </div>
+        <button class="stepper" id="bagsPlus" aria-label="increase">+</button>
+      </div>
+      <button class="btn btn-primary" id="btnToSummary">REVIEW & SEND</button>
+    </section>
+
+    <!-- SUMMARY / SEND -->
+    <section class="screen" id="screen-summary">
+      <h1 style="margin:0">Review walk</h1>
+      <div class="card">
+        <h2>Header</h2>
+        <div id="summaryHeader" style="font-size:14px"></div>
+      </div>
+      <div class="card">
+        <h2>Rooms</h2>
+        <ul class="summary-list" id="summaryRooms"></ul>
+      </div>
+      <div class="card">
+        <h2>Sanitation</h2>
+        <ul class="summary-list" id="summarySani"></ul>
+      </div>
+      <div class="card">
+        <h2>Non-MMJ waste</h2>
+        <ul class="summary-list" id="summaryWaste"></ul>
+      </div>
+      <button class="btn btn-send" id="btnSend">EMAIL TO COMPLIANCE</button>
+      <button class="btn btn-ghost" id="btnCopy">Copy text instead</button>
+      <button class="btn btn-back" id="btnEditFromSummary">Back to edit</button>
+      <button class="btn btn-back" id="btnResetAll" style="color:var(--warn)">Discard & start over</button>
+    </section>
+  </main>
+
+  <footer>
+    <button class="btn btn-back" id="btnBack">← Back</button>
+    <div class="info" id="footerInfo"></div>
+  </footer>
+</div>
+
+<script>
+  // ---------- DATA ----------
+  const ROOMS = [
+    // section, name
+    { sec: "flower", name: "A1" }, { sec: "flower", name: "A2" }, { sec: "flower", name: "A3" }, { sec: "flower", name: "A4" },
+    { sec: "flower", name: "B1" }, { sec: "flower", name: "B2" }, { sec: "flower", name: "B3" }, { sec: "flower", name: "B4" },
+    { sec: "flower", name: "B5" }, { sec: "flower", name: "B6" }, { sec: "flower", name: "B7" }, { sec: "flower", name: "B8" },
+    { sec: "flower", name: "C1" }, { sec: "flower", name: "C2" }, { sec: "flower", name: "C3" }, { sec: "flower", name: "C4" },
+    { sec: "flower", name: "C5" }, { sec: "flower", name: "C6" }, { sec: "flower", name: "F2" }, { sec: "flower", name: "G"  },
+    { sec: "veg",    name: "D"  }, { sec: "veg",    name: "E"  }, { sec: "veg",    name: "GH3" }, { sec: "veg",    name: "GH4" },
+    { sec: "prop",   name: "F1" }, { sec: "prop",   name: "H"  }
+  ];
+  // Dry rooms are handled in one consolidated screen
+  const DRY_ROOMS = ["F4","ctr16","ctr17","ctr18","Ctr19","Ctr20","Ctr21","Ctr22"];
+
+  const SEC_LABEL = { flower: "FLOWER", veg: "VEG", prop: "PROP", dry: "DRY" };
+
+  // ---------- STATE ----------
+  const STORAGE_KEY = "yellowstar_walk_v1";
+  let state = loadState() || initState();
+  let currentIssueRoomIdx = null;
+  let currentIssueSet = new Set();
+
+  function initState() {
+    return {
+      date: todayISO(),
+      initials: "",
+      idx: -1,            // -1 = start screen; 0..ROOMS.length-1 = room idx; "sanitation" or "summary" handled separately
+      stage: "start",     // start | room | sanitation | waste | summary
+      results: {},        // room name -> { value: "1234" | "EMPTY" | "ISSUE", issues: [], }
+      sani: { floors: false, doors: false, dry: false, irrig: false },
+      waste: { bags: 0 }
+    };
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return s;
+    } catch (e) { return null; }
+  }
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  function clearState() {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+  function todayISO() {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+  }
+
+  // ---------- DOM ----------
+  const screens = {
+    pin: document.getElementById("screen-pin"),
+    start: document.getElementById("screen-start"),
+    room: document.getElementById("screen-room"),
+    issue: document.getElementById("screen-issue"),
+    dry: document.getElementById("screen-dry"),
+    sanitation: document.getElementById("screen-sanitation"),
+    waste: document.getElementById("screen-waste"),
+    summary: document.getElementById("screen-summary"),
+  };
+  const inputDate = document.getElementById("inputDate");
+  const inputInitials = document.getElementById("inputInitials");
+  const btnStart = document.getElementById("btnStart");
+  const btnResume = document.getElementById("btnResume");
+  const progressBar = document.getElementById("progressBar");
+  const footerInfo = document.getElementById("footerInfo");
+  const btnBack = document.getElementById("btnBack");
+
+  const roomPill = document.getElementById("roomPill");
+  const roomName = document.getElementById("roomName");
+  const roomSub  = document.getElementById("roomSub");
+  const inputTag = document.getElementById("inputTag");
+  const btnEmpty = document.getElementById("btnEmpty");
+  const btnIssue = document.getElementById("btnIssue");
+  const btnNext  = document.getElementById("btnNext");
+  const btnHarvested = document.getElementById("btnHarvested");
+  const btnOk = document.getElementById("btnOk");
+  const tagCard = document.getElementById("tagCard");
+  const btnPhoto = document.getElementById("btnPhoto");
+  const inputImage = document.getElementById("inputImage");
+  const photoPreview = document.getElementById("photoPreview");
+  const photoThumb = document.getElementById("photoThumb");
+  const roomJump = document.getElementById("roomJump");
+
+  // Populate jump-to-room dropdown
+  (function populateJump() {
+    let lastSec = "";
+    let currentGroup = null;
+    ROOMS.forEach((r, i) => {
+      if (r.sec !== lastSec) {
+        currentGroup = document.createElement("optgroup");
+        currentGroup.label = SEC_LABEL[r.sec];
+        roomJump.appendChild(currentGroup);
+        lastSec = r.sec;
+      }
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = r.name;
+      currentGroup.appendChild(opt);
+    });
+  })();
+
+  roomJump.addEventListener("change", () => {
+    const idx = parseInt(roomJump.value, 10);
+    if (!isNaN(idx)) {
+      state.idx = idx;
+      renderRoom();
+      saveState();
+    }
+  });
+
+  const issueRoom = document.getElementById("issueRoom");
+  const issueChips = document.getElementById("issueChips");
+  const btnSaveIssue = document.getElementById("btnSaveIssue");
+  const btnCancelIssue = document.getElementById("btnCancelIssue");
+
+  const sanitationList = document.getElementById("sanitationList");
+  const btnToSummary = document.getElementById("btnToSummary");
+
+  const summaryHeader = document.getElementById("summaryHeader");
+  const summaryRooms = document.getElementById("summaryRooms");
+  const summarySani  = document.getElementById("summarySani");
+  const btnSend = document.getElementById("btnSend");
+  const btnCopy = document.getElementById("btnCopy");
+  const btnEditFromSummary = document.getElementById("btnEditFromSummary");
+  const btnResetAll = document.getElementById("btnResetAll");
+
+  // ---------- NAV ----------
+  function show(stage) {
+    state.stage = stage;
+    Object.values(screens).forEach(s => s.classList.remove("active"));
+    if (stage === "pin") screens.pin.classList.add("active");
+    else if (stage === "start") screens.start.classList.add("active");
+    else if (stage === "room") screens.room.classList.add("active");
+    else if (stage === "issue") screens.issue.classList.add("active");
+    else if (stage === "dry") screens.dry.classList.add("active");
+    else if (stage === "sanitation") screens.sanitation.classList.add("active");
+    else if (stage === "waste") screens.waste.classList.add("active");
+    else if (stage === "summary") screens.summary.classList.add("active");
+    updateProgress();
+    updateFooter();
+    saveState();
+  }
+
+  function updateProgress() {
+    const total = ROOMS.length + 4; // rooms + dry + sanitation + waste + summary
+    let done = 0;
+    if (state.stage === "room") done = state.idx;
+    else if (state.stage === "dry") done = ROOMS.length;
+    else if (state.stage === "sanitation") done = ROOMS.length + 1;
+    else if (state.stage === "waste") done = ROOMS.length + 2;
+    else if (state.stage === "summary") done = ROOMS.length + 3;
+    progressBar.style.width = Math.max(0, Math.min(100, (done / total) * 100)) + "%";
+  }
+
+  function updateFooter() {
+    if (state.stage === "start") footerInfo.textContent = "";
+    else if (state.stage === "room") footerInfo.textContent = `${state.idx + 1} / ${ROOMS.length}`;
+    else if (state.stage === "dry") footerInfo.textContent = "Dry rooms";
+    else if (state.stage === "sanitation") footerInfo.textContent = "Sanitation";
+    else if (state.stage === "waste") footerInfo.textContent = "Waste";
+    else footerInfo.textContent = "Review";
+    btnBack.style.visibility = (state.stage === "start" || state.stage === "pin") ? "hidden" : "visible";
+  }
+
+  // ---------- START ----------
+  function renderStart() {
+    inputDate.value = state.date || todayISO();
+    inputInitials.value = state.initials || "";
+    const hasProgress = state.idx > -1 || Object.keys(state.results).length > 0;
+    btnResume.style.display = hasProgress ? "block" : "none";
+    btnStart.textContent = hasProgress ? "START NEW WALK" : "START WALK";
+  }
+  function startWalk() {
+    try {
+      let initials = (inputInitials.value || "").trim().toUpperCase();
+      if (!initials) initials = "JB";
+      state = initState();
+      state.date = inputDate.value || todayISO();
+      state.initials = initials;
+      state.idx = 0;
+      renderRoom();
+      show("room");
+    } catch (err) {
+      alert("START WALK error: " + (err && err.message ? err.message : err));
+      console.error(err);
+    }
+  }
+  btnStart.addEventListener("click", startWalk);
+  btnStart.addEventListener("touchend", function(e){ e.preventDefault(); startWalk(); });
+  btnResume.addEventListener("click", () => {
+    state.date = inputDate.value || state.date;
+    state.initials = (inputInitials.value || state.initials).toUpperCase();
+    if (state.stage === "start") {
+      if (Object.keys(state.results).length >= ROOMS.length) {
+        show("sanitation");
+      } else {
+        state.idx = Math.max(0, Object.keys(state.results).length);
+        renderRoom();
+        show("room");
+      }
+    } else {
+      if (state.stage === "room") renderRoom();
+      show(state.stage);
+    }
+  });
+
+  // ---------- ROOM ----------
+  function renderRoom() {
+    const r = ROOMS[state.idx];
+    roomJump.value = state.idx;
+    roomPill.textContent = SEC_LABEL[r.sec];
+    roomPill.className = "pill " + r.sec;
+    roomName.textContent = r.name;
+    const existing = state.results[r.name];
+    const isFlower = (r.sec === "flower");
+    const isVeg    = (r.sec === "veg");
+    // Reset UI
+    tagCard.style.display      = "none";
+    btnNext.style.display      = "none";
+    btnHarvested.style.display = "none";
+    btnOk.style.display        = "none";
+    btnPhoto.style.display     = "none";
+    photoPreview.style.display = "none";
+    photoThumb.src             = "";
+    inputImage.value           = "";
+
+    if (isFlower) {
+      tagCard.style.display      = "block";
+      btnNext.style.display      = "flex";
+      btnHarvested.style.display = "flex";
+      inputTag.value = (existing && /^\d+$/.test(existing.value)) ? existing.value : "";
+      inputTag.focus({ preventScroll: true });
+      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — pull one tag, enter last 6`;
+    } else if (isVeg) {
+      btnPhoto.style.display = "flex";
+      btnNext.style.display  = "flex";
+      btnNext.disabled = !(existing && existing.value === "PHOTO");
+      if (existing && existing.imgData) {
+        photoThumb.src = existing.imgData;
+        photoPreview.style.display = "block";
+      }
+      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — snap a photo of the whiteboard`;
+    } else {
+      btnOk.style.display = "flex";
+      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — confirm status`;
+    }
+  }
+
+  inputTag.addEventListener("input", () => {
+    inputTag.value = inputTag.value.replace(/\D/g, "").slice(0, 6);
+  });
+  btnNext.addEventListener("click", () => {
+    const r = ROOMS[state.idx];
+    if (r.sec === "flower") {
+      const v = inputTag.value.trim();
+      if (!/^\d{6}$/.test(v)) {
+        inputTag.focus();
+        inputTag.style.borderColor = "#b91c1c";
+        setTimeout(() => { inputTag.style.borderColor = ""; }, 1200);
+        return;
+      }
+      saveRoom(v);
+      advance();
+    } else if (r.sec === "veg") {
+      const existing = state.results[r.name];
+      if (!existing || existing.value !== "PHOTO") return;
+      advance();
+    } else {
+      advance();
+    }
+  });
+
+  btnPhoto.addEventListener("click", () => inputImage.click());
+  inputImage.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      const dataUrl = ev.target.result;
+      const r = ROOMS[state.idx];
+      const prev = state.results[r.name] || {};
+      // Cap image stored in localStorage size — keep thumb, mark photo taken
+      state.results[r.name] = { value: "PHOTO", issues: prev.issues || [], imgData: dataUrl, imgName: file.name || `${r.name}.jpg` };
+      try { saveState(); } catch (err) {
+        // localStorage quota — fall back to flagging photo taken without image
+        state.results[r.name] = { value: "PHOTO", issues: prev.issues || [], imgName: file.name || `${r.name}.jpg` };
+        try { saveState(); } catch (_) {}
+      }
+      photoThumb.src = dataUrl;
+      photoPreview.style.display = "block";
+      btnNext.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+  btnEmpty.addEventListener("click", () => {
+    saveRoom("EMPTY");
+    advance();
+  });
+  btnHarvested.addEventListener("click", () => {
+    saveRoom("HARVESTED");
+    advance();
+  });
+  btnOk.addEventListener("click", () => {
+    saveRoom("OK");
+    advance();
+  });
+  btnIssue.addEventListener("click", () => {
+    currentIssueRoomIdx = state.idx;
+    currentIssueSet = new Set(state.results[ROOMS[state.idx].name]?.issues || []);
+    [...issueChips.children].forEach(c => {
+      c.classList.toggle("active", currentIssueSet.has(c.dataset.issue));
+    });
+    issueRoom.textContent = `${ROOMS[state.idx].name} — flag issue`;
+    show("issue");
+  });
+
+  function saveRoom(value) {
+    const name = ROOMS[state.idx].name;
+    const prev = state.results[name] || {};
+    state.results[name] = { value, issues: prev.issues || [] };
+    saveState();
+  }
+
+  function advance() {
+    if (state.idx + 1 >= ROOMS.length) {
+      renderDry();
+      show("dry");
+    } else {
+      state.idx += 1;
+      renderRoom();
+      show("room");
+    }
+  }
+
+  // ---------- ISSUE ----------
+  issueChips.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("chip")) return;
+    const v = e.target.dataset.issue;
+    if (currentIssueSet.has(v)) currentIssueSet.delete(v);
+    else currentIssueSet.add(v);
+    e.target.classList.toggle("active");
+  });
+  btnSaveIssue.addEventListener("click", () => {
+    const name = ROOMS[currentIssueRoomIdx].name;
+    const prev = state.results[name] || {};
+    state.results[name] = {
+      value: prev.value || "ISSUE",
+      issues: [...currentIssueSet]
+    };
+    saveState();
+    state.idx = currentIssueRoomIdx;
+    advance();
+  });
+  btnCancelIssue.addEventListener("click", () => {
+    state.idx = currentIssueRoomIdx;
+    show("room");
+  });
+
+  // ---------- SANITATION ----------
+  sanitationList.addEventListener("click", (e) => {
+    const row = e.target.closest(".check-row");
+    if (!row) return;
+    const key = row.dataset.key;
+    state.sani[key] = !state.sani[key];
+    row.classList.toggle("checked", state.sani[key]);
+    saveState();
+  });
+  function renderSanitation() {
+    [...sanitationList.children].forEach(r => {
+      r.classList.toggle("checked", !!state.sani[r.dataset.key]);
+    });
+  }
+  // ---------- DRY ROOMS (batch screen) ----------
+  const dryList = document.getElementById("dryList");
+  const btnDryNext = document.getElementById("btnDryNext");
+
+  function renderDry() {
+    dryList.innerHTML = "";
+    DRY_ROOMS.forEach(name => {
+      const existing = state.results[name] || {};
+      const row = document.createElement("div");
+      row.className = "dry-row" + (existing.value === "EMPTY" ? " is-empty" : "");
+      row.innerHTML = `
+        <div class="name">${name}</div>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+               placeholder="000000" data-room="${name}"
+               value="${(existing.value && /^\d+$/.test(existing.value)) ? existing.value : ""}"
+               ${existing.value === "EMPTY" ? "disabled" : ""} />
+        <button class="empty-toggle" data-room="${name}">EMPTY</button>
+      `;
+      dryList.appendChild(row);
+    });
+  }
+
+  dryList.addEventListener("input", (e) => {
+    const inp = e.target;
+    if (inp.tagName !== "INPUT") return;
+    inp.value = inp.value.replace(/\D/g, "").slice(0, 6);
+    const name = inp.dataset.room;
+    const prev = state.results[name] || {};
+    state.results[name] = { value: inp.value, issues: prev.issues || [] };
+    saveState();
+  });
+  dryList.addEventListener("click", (e) => {
+    if (!e.target.classList.contains("empty-toggle")) return;
+    const name = e.target.dataset.room;
+    const row = e.target.closest(".dry-row");
+    const input = row.querySelector("input");
+    const prev = state.results[name] || {};
+    if (prev.value === "EMPTY") {
+      state.results[name] = { value: "", issues: prev.issues || [] };
+      row.classList.remove("is-empty");
+      input.disabled = false;
+      input.value = "";
+    } else {
+      state.results[name] = { value: "EMPTY", issues: prev.issues || [] };
+      row.classList.add("is-empty");
+      input.disabled = true;
+      input.value = "";
+    }
+    saveState();
+  });
+  btnDryNext.addEventListener("click", () => { show("sanitation"); });
+
+  // ---------- WASTE ----------
+  const btnToWaste = document.getElementById("btnToWaste");
+  const bagsMinus = document.getElementById("bagsMinus");
+  const bagsPlus  = document.getElementById("bagsPlus");
+  const bagNum    = document.getElementById("bagNum");
+
+  function renderWaste() {
+    if (!state.waste) state.waste = { bags: 0 };
+    bagNum.textContent = state.waste.bags;
+    bagsMinus.disabled = state.waste.bags <= 0;
+  }
+  btnToWaste.addEventListener("click", () => { renderWaste(); show("waste"); });
+  bagsMinus.addEventListener("click", () => {
+    state.waste.bags = Math.max(0, (state.waste.bags || 0) - 1);
+    renderWaste(); saveState();
+  });
+  bagsPlus.addEventListener("click", () => {
+    state.waste.bags = (state.waste.bags || 0) + 1;
+    renderWaste(); saveState();
+  });
+
+  btnToSummary.addEventListener("click", () => {
+    renderSummary();
+    show("summary");
+  });
+
+  // ---------- SUMMARY ----------
+  function renderSummary() {
+    const photoCount = Object.values(state.results).filter(r => r && r.imgData).length;
+    summaryHeader.innerHTML = `<strong>Date:</strong> ${state.date}<br/><strong>Initials:</strong> ${state.initials}` +
+      (photoCount ? `<br/><strong>Photos:</strong> ${photoCount} attached` : "");
+    btnSend.textContent = photoCount ? `SEND — ${photoCount} PHOTO${photoCount>1?"S":""} ATTACHED` : "EMAIL TO COMPLIANCE";
+    summaryRooms.innerHTML = "";
+    const ALL_ROOMS = ROOMS.concat(DRY_ROOMS.map(n => ({sec:"dry", name:n})));
+    ALL_ROOMS.forEach(r => {
+      const res = state.results[r.name];
+      const li = document.createElement("li");
+      let val = "—";
+      let cls = "val";
+      if (res) {
+        if (res.value === "EMPTY") { val = "EMPTY"; cls = "val empty"; }
+        else if (res.value === "HARVESTED") { val = "HARVESTED"; cls = "val harvest"; }
+        else if (res.value === "OK") { val = "OK"; }
+        else if (res.value === "PHOTO") { val = "📷 photo"; }
+        else if (/^\d+$/.test(res.value)) { val = `…${res.value}`; }
+        else if (res.value === "ISSUE") { val = "ISSUE"; cls = "val issue"; }
+      }
+      if (res?.issues?.length) {
+        val += ` ⚑ ${res.issues.join(", ")}`;
+        cls = "val issue";
+      }
+      const hasPhoto = !!(res && res.imgData);
+      if (hasPhoto) {
+        li.className = "has-photo";
+        li.innerHTML = `
+          <div class="photo-row">
+            <span class="room-label">${r.name}</span>
+            <span class="${cls}">${val}</span>
+          </div>
+          <img class="photo-thumb" src="${res.imgData}" alt="${r.name} photo" />
+        `;
+      } else {
+        li.innerHTML = `<span class="room-label">${r.name}</span><span class="${cls}">${val}</span>`;
+      }
+      summaryRooms.appendChild(li);
+    });
+    summarySani.innerHTML = "";
+    const SANI_LABELS = {
+      floors: "Floors swept", doors: "Doors locked", dry: "Dry room temp/RH", irrig: "Irrigation OK"
+    };
+    Object.entries(state.sani).forEach(([k, v]) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="room-label">${SANI_LABELS[k]}</span><span class="val ${v ? '' : 'issue'}">${v ? "OK" : "—"}</span>`;
+      summarySani.appendChild(li);
+    });
+    // Waste
+    const summaryWaste = document.getElementById("summaryWaste");
+    summaryWaste.innerHTML = "";
+    const bags = (state.waste && state.waste.bags) || 0;
+    const liw = document.createElement("li");
+    liw.innerHTML = `<span class="room-label">Bags out today</span><span class="val">${bags}</span>`;
+    summaryWaste.appendChild(liw);
+  }
+
+  function buildEmailBody() {
+    const lines = [];
+    lines.push(`Yellow Star LLC — Daily Walk Log`);
+    lines.push(`License GAAI-QI5G-DEQQ`);
+    lines.push(`Date: ${state.date}`);
+    lines.push(`Recorded by: ${state.initials}`);
+    lines.push("");
+    let lastSec = "";
+    const ALL_ROOMS = ROOMS.concat(DRY_ROOMS.map(n => ({sec:"dry", name:n})));
+    ALL_ROOMS.forEach(r => {
+      if (r.sec !== lastSec) {
+        lines.push("");
+        lines.push(`-- ${SEC_LABEL[r.sec]} --`);
+        lastSec = r.sec;
+      }
+      const res = state.results[r.name];
+      let val = "—";
+      if (res) {
+        if (res.value === "EMPTY") val = "EMPTY";
+        else if (res.value === "HARVESTED") val = "HARVESTED";
+        else if (res.value === "OK") val = "OK";
+        else if (res.value === "PHOTO") val = "PHOTO taken (attach to email)";
+        else if (/^\d+$/.test(res.value)) val = `tag ...${res.value}`;
+        else if (res.value === "ISSUE") val = "ISSUE";
+      }
+      if (res?.issues?.length) val += ` | flags: ${res.issues.join(", ")}`;
+      lines.push(`  ${r.name.padEnd(6, " ")} ${val}`);
+    });
+    lines.push("");
+    lines.push(`-- SANITATION --`);
+    const SANI_LABELS = { floors: "Floors swept", doors: "Doors locked", dry: "Dry temp/RH", irrig: "Irrigation OK" };
+    Object.entries(state.sani).forEach(([k, v]) => {
+      lines.push(`  ${SANI_LABELS[k]}: ${v ? "OK" : "—"}`);
+    });
+    lines.push("");
+    lines.push(`-- NON-MMJ WASTE --`);
+    lines.push(`  Bags out today: ${(state.waste && state.waste.bags) || 0}`);
+    return lines.join("\n");
+  }
+  function buildSubject() {
+    const [y, m, d] = state.date.split("-");
+    return `Daily Walk Log – ${m}/${d}/${y}`;
+  }
+  function dataURLtoFile(dataurl, filename) {
+    try {
+      const arr = dataurl.split(",");
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) u8arr[n] = bstr.charCodeAt(n);
+      return new File([u8arr], filename, { type: mime });
+    } catch (e) { return null; }
+  }
+
+  function collectPhotos() {
+    const files = [];
+    Object.keys(state.results).forEach(name => {
+      const res = state.results[name];
+      if (res && res.imgData && res.imgData.startsWith("data:image")) {
+        const safeName = name.replace(/[^A-Za-z0-9_-]/g, "_");
+        const file = dataURLtoFile(res.imgData, `${state.date}_${safeName}.jpg`);
+        if (file) files.push(file);
+      }
+    });
+    return files;
+  }
+
+  async function sendWalk() {
+    const to = "yellowstargroup@icloud.com";
+    const subj = buildSubject();
+    const body = buildEmailBody();
+    const photos = collectPhotos();
+
+    // Try Web Share API first if we have photos and the device supports file sharing
+    if (photos.length && navigator.canShare && navigator.canShare({ files: photos })) {
+      try {
+        await navigator.share({
+          title: subj,
+          text: `To: ${to}\nSubject: ${subj}\n\n${body}`,
+          files: photos
+        });
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // user cancelled
+        // fall through to mailto
+      }
+    }
+
+    if (photos.length) {
+      alert(`Photos can't auto-attach on this device. After Mail opens, attach the ${photos.length} photo${photos.length>1?"s":""} from your Photos library before sending.`);
+    }
+    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  }
+  btnSend.addEventListener("click", sendWalk);
+  btnCopy.addEventListener("click", async () => {
+    const text = `Subject: ${buildSubject()}\n\n${buildEmailBody()}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      btnCopy.textContent = "Copied ✓";
+      setTimeout(() => btnCopy.textContent = "Copy text instead", 1500);
+    } catch (e) {
+      alert("Couldn't copy — long press the screen and select all from the summary above.");
+    }
+  });
+  btnEditFromSummary.addEventListener("click", () => { state.idx = 0; renderRoom(); show("room"); });
+  btnResetAll.addEventListener("click", () => {
+    if (!confirm("Discard this walk and start over?")) return;
+    clearState();
+    state = initState();
+    renderStart();
+    show("start");
+  });
+
+  // ---------- BACK ----------
+  btnBack.addEventListener("click", () => {
+    if (state.stage === "room") {
+      if (state.idx > 0) { state.idx -= 1; renderRoom(); show("room"); }
+      else { show("start"); }
+    } else if (state.stage === "issue") {
+      show("room");
+    } else if (state.stage === "dry") {
+      state.idx = ROOMS.length - 1; renderRoom(); show("room");
+    } else if (state.stage === "sanitation") {
+      renderDry(); show("dry");
+    } else if (state.stage === "waste") {
+      renderSanitation(); show("sanitation");
+    } else if (state.stage === "summary") {
+      renderWaste(); show("waste");
+    }
+  });
+
+  // ---------- PIN GATE ----------
+  const PIN_CODE = "2845"; // change here to update PIN (street number default)
+  const PIN_UNLOCK_KEY = "yellowstar_pin_ok_v1";
+  const inputPin = document.getElementById("inputPin");
+  const btnPin = document.getElementById("btnPin");
+  const pinError = document.getElementById("pinError");
+
+  function tryUnlock() {
+    if (inputPin.value === PIN_CODE) {
+      localStorage.setItem(PIN_UNLOCK_KEY, "1");
+      renderStart();
+      renderSanitation();
+      state.stage = "start";
+      show("start");
+    } else {
+      pinError.style.display = "block";
+      inputPin.value = "";
+      inputPin.focus();
+      setTimeout(() => pinError.style.display = "none", 1500);
+    }
+  }
+  inputPin.addEventListener("input", () => {
+    inputPin.value = inputPin.value.replace(/\D/g, "").slice(0, 4);
+    if (inputPin.value.length === 4) tryUnlock();
+  });
+  btnPin.addEventListener("click", tryUnlock);
+
+  // ---------- INIT ----------
+  if (localStorage.getItem(PIN_UNLOCK_KEY) === "1") {
+    renderStart();
+    renderSanitation();
+    state.stage = "start";
+    show("start");
+  } else {
+    show("pin");
+    setTimeout(() => inputPin.focus(), 100);
+  }
+</script>
+</body>
+</html>
