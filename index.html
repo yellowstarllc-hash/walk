@@ -292,26 +292,10 @@
       <div class="action-row" id="actionRow">
         <button class="btn btn-empty btn-sm" id="btnEmpty">EMPTY</button>
         <button class="btn btn-harvest btn-sm" id="btnHarvested" style="display:none">HARVESTED</button>
-        <button class="btn btn-issue btn-sm" id="btnIssue">FLAG</button>
       </div>
     </section>
 
-    <!-- ISSUE PICKER -->
-    <section class="screen" id="screen-issue">
-      <div class="card">
-        <h1 id="issueRoom">A1 — flag issue</h1>
-        <p style="margin:0 0 14px; color:var(--muted); font-size:14px;">Tap the issue. You can pick more than one.</p>
-        <div class="chips" id="issueChips">
-          <div class="chip" data-issue="tag mismatch">Tag mismatch</div>
-          <div class="chip" data-issue="pests">Pests</div>
-          <div class="chip" data-issue="irrigation">Irrigation</div>
-          <div class="chip" data-issue="debris">Debris</div>
-          <div class="chip" data-issue="other">Other</div>
-        </div>
-      </div>
-      <button class="btn btn-primary" id="btnSaveIssue">SAVE & CONTINUE</button>
-      <button class="btn btn-back" id="btnCancelIssue">Cancel</button>
-    </section>
+
 
     <!-- DRY ROOMS SCREEN (consolidated) -->
     <section class="screen" id="screen-dry">
@@ -400,8 +384,6 @@
   // ---------- STATE ----------
   const STORAGE_KEY = "yellowstar_walk_v1";
   let state = loadState() || initState();
-  let currentIssueRoomIdx = null;
-  let currentIssueSet = new Set();
 
   function initState() {
     return {
@@ -439,7 +421,6 @@
     pin: document.getElementById("screen-pin"),
     start: document.getElementById("screen-start"),
     room: document.getElementById("screen-room"),
-    issue: document.getElementById("screen-issue"),
     dry: document.getElementById("screen-dry"),
     sanitation: document.getElementById("screen-sanitation"),
     waste: document.getElementById("screen-waste"),
@@ -457,7 +438,6 @@
   const roomSub  = document.getElementById("roomSub");
   const inputTag = document.getElementById("inputTag");
   const btnEmpty = document.getElementById("btnEmpty");
-  const btnIssue = document.getElementById("btnIssue");
   const btnNext  = document.getElementById("btnNext");
   const btnHarvested = document.getElementById("btnHarvested");
   const btnOk = document.getElementById("btnOk");
@@ -544,7 +524,6 @@
     if (stage === "pin") screens.pin.classList.add("active");
     else if (stage === "start") screens.start.classList.add("active");
     else if (stage === "room") screens.room.classList.add("active");
-    else if (stage === "issue") screens.issue.classList.add("active");
     else if (stage === "dry") screens.dry.classList.add("active");
     else if (stage === "sanitation") screens.sanitation.classList.add("active");
     else if (stage === "waste") screens.waste.classList.add("active");
@@ -642,6 +621,7 @@
       inputTag.value = (existing && /^\d+$/.test(existing.value)) ? existing.value : "";
       inputTag.focus({ preventScroll: true });
       roomSub.textContent = "Pull a tag · last 6";
+      renderPhotoGrid(); // optional whiteboard photo
     } else if (isVeg) {
       btnNext.style.display  = "flex";
       renderPhotoGrid();
@@ -659,14 +639,24 @@
     const r = ROOMS[state.idx];
     if (r.sec === "flower") {
       const v = inputTag.value.trim();
-      if (!/^\d{6}$/.test(v)) {
-        inputTag.focus();
-        inputTag.style.borderColor = "#b91c1c";
-        setTimeout(() => { inputTag.style.borderColor = ""; }, 1200);
+      const existing = state.results[r.name] || {};
+      const hasPhotos = (existing.images || []).length > 0;
+      if (/^\d{6}$/.test(v)) {
+        saveRoom(v);
+        advance();
         return;
       }
-      saveRoom(v);
-      advance();
+      if (hasPhotos) {
+        // no tag but has photos — save with PHOTO marker, keep images
+        saveRoom("PHOTO");
+        advance();
+        return;
+      }
+      // neither — flash red
+      inputTag.focus();
+      inputTag.style.borderColor = "#b91c1c";
+      setTimeout(() => { inputTag.style.borderColor = ""; }, 1200);
+      return;
     } else if (r.sec === "veg") {
       const existing = state.results[r.name];
       if (!existing || existing.value !== "PHOTO") return;
@@ -680,6 +670,7 @@
     const r = ROOMS[state.idx];
     const res = state.results[r.name] || {};
     const images = res.images || [];
+    const isVeg = r.sec === "veg";
     photoGrid.innerHTML = "";
     images.forEach((img, i) => {
       const tile = document.createElement("div");
@@ -687,12 +678,21 @@
       tile.innerHTML = `<img src="${img.dataUrl}" alt="photo ${i+1}"><button class="remove" data-idx="${i}" aria-label="remove">✕</button>`;
       photoGrid.appendChild(tile);
     });
-    photoCount.textContent = `${images.length} / ${MAX_PHOTOS_PER_ROOM} photos`;
-    photoCount.style.display = "block";
+    if (images.length) {
+      photoCount.textContent = `${images.length} / ${MAX_PHOTOS_PER_ROOM} photos`;
+      photoCount.style.display = "block";
+    } else {
+      photoCount.style.display = "none";
+    }
     const atMax = images.length >= MAX_PHOTOS_PER_ROOM;
     btnPhoto.style.display = atMax ? "none" : "flex";
-    btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD IMAGE" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
-    btnNext.disabled = images.length === 0;
+    if (isVeg) {
+      btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD WHITEBOARD" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+      btnNext.disabled = images.length === 0;
+    } else {
+      btnPhoto.textContent = images.length === 0 ? "📷 WHITEBOARD PHOTO (optional)" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+      btnNext.disabled = false; // flower: photo is optional
+    }
   }
 
   photoGrid.addEventListener("click", (e) => {
@@ -753,27 +753,31 @@
     advance();
   });
   btnHarvested.addEventListener("click", () => {
-    saveRoom("HARVESTED");
+    const r = ROOMS[state.idx];
+    const prev = state.results[r.name] || {};
+    state.results[r.name] = {
+      value: "HARVESTED",
+      harvestDate: todayISO(),
+      cleanDone: true,
+      images: prev.images || [],
+      issues: prev.issues || []
+    };
+    saveState();
     advance();
   });
   btnOk.addEventListener("click", () => {
     saveRoom("OK");
     advance();
   });
-  btnIssue.addEventListener("click", () => {
-    currentIssueRoomIdx = state.idx;
-    currentIssueSet = new Set(state.results[ROOMS[state.idx].name]?.issues || []);
-    [...issueChips.children].forEach(c => {
-      c.classList.toggle("active", currentIssueSet.has(c.dataset.issue));
-    });
-    issueRoom.textContent = `${ROOMS[state.idx].name} — flag issue`;
-    show("issue");
-  });
 
   function saveRoom(value) {
     const name = ROOMS[state.idx].name;
     const prev = state.results[name] || {};
-    state.results[name] = { value, issues: prev.issues || [] };
+    state.results[name] = {
+      value,
+      issues: prev.issues || [],
+      images: prev.images || []
+    };
     saveState();
   }
 
@@ -788,29 +792,6 @@
     }
   }
 
-  // ---------- ISSUE ----------
-  issueChips.addEventListener("click", (e) => {
-    if (!e.target.classList.contains("chip")) return;
-    const v = e.target.dataset.issue;
-    if (currentIssueSet.has(v)) currentIssueSet.delete(v);
-    else currentIssueSet.add(v);
-    e.target.classList.toggle("active");
-  });
-  btnSaveIssue.addEventListener("click", () => {
-    const name = ROOMS[currentIssueRoomIdx].name;
-    const prev = state.results[name] || {};
-    state.results[name] = {
-      value: prev.value || "ISSUE",
-      issues: [...currentIssueSet]
-    };
-    saveState();
-    state.idx = currentIssueRoomIdx;
-    advance();
-  });
-  btnCancelIssue.addEventListener("click", () => {
-    state.idx = currentIssueRoomIdx;
-    show("room");
-  });
 
   // ---------- SANITATION ----------
   sanitationList.addEventListener("click", (e) => {
@@ -919,7 +900,10 @@
       let cls = "val";
       if (res) {
         if (res.value === "EMPTY") { val = "EMPTY"; cls = "val empty"; }
-        else if (res.value === "HARVESTED") { val = "HARVESTED"; cls = "val harvest"; }
+        else if (res.value === "HARVESTED") {
+          val = `HARVESTED ${res.harvestDate || state.date}${res.cleanDone ? " · cleaned" : " · clean pending"}`;
+          cls = "val harvest";
+        }
         else if (res.value === "OK") { val = "OK"; }
         else if (res.value === "PHOTO") { val = "📷 photo"; }
         else if (/^\d+$/.test(res.value)) { val = `…${res.value}`; }
@@ -1049,7 +1033,11 @@
   function fmtResultForPDF(res) {
     if (!res) return "—";
     if (res.value === "EMPTY") return "EMPTY";
-    if (res.value === "HARVESTED") return "HARVESTED";
+    if (res.value === "HARVESTED") {
+      const d = res.harvestDate || state.date;
+      const clean = res.cleanDone ? "post-harvest cleaning complete" : "cleaning pending";
+      return `HARVESTED ${d} · ${clean}`;
+    }
     if (res.value === "OK") return "OK";
     if (res.value === "PHOTO") return `${(res.images || []).length} photo(s) attached`;
     if (/^\d+$/.test(res.value)) return `tag ...${res.value}`;
@@ -1260,8 +1248,6 @@
     if (state.stage === "room") {
       if (state.idx > 0) { state.idx -= 1; renderRoom(); show("room"); }
       else { show("start"); }
-    } else if (state.stage === "issue") {
-      show("room");
     } else if (state.stage === "dry") {
       state.idx = ROOMS.length - 1; renderRoom(); show("room");
     } else if (state.stage === "sanitation") {
