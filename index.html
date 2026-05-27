@@ -144,6 +144,30 @@
   .check-row.checked .box { background: var(--good); border-color: var(--good); color: #fff; }
   .check-row .label { font-size: 15px; flex: 1; }
 
+  .photo-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .photo-grid:empty { display: none; }
+  .photo-tile {
+    position: relative; aspect-ratio: 1; border-radius: 10px;
+    overflow: hidden; border: 2px solid var(--good); background: #f1f5f9;
+  }
+  .photo-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-tile .remove {
+    position: absolute; top: 4px; right: 4px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(15, 29, 49, 0.85); color: #fff;
+    border: none; font-size: 14px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0; line-height: 1;
+  }
+  .summary-list .photo-strip {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px;
+  }
+  .summary-list .photo-strip img {
+    width: 100%; aspect-ratio: 1; object-fit: cover;
+    border-radius: 6px; border: 1px solid var(--line);
+  }
   .dry-row {
     display: flex; align-items: center; gap: 8px;
     padding: 8px 0; border-bottom: 1px solid var(--line);
@@ -264,15 +288,13 @@
                class="tag-input" id="inputTag" placeholder="000000" />
       </div>
 
-      <div id="photoPreview" style="display:none; text-align:center;">
-        <img id="photoThumb" style="max-width:60%; max-height:160px; border-radius:10px; border:2px solid var(--good);" />
-        <div style="color:var(--good); font-weight:600; font-size:13px; margin-top:6px;">✓ Photo captured</div>
-      </div>
+      <div id="photoGrid" class="photo-grid"></div>
+      <div id="photoCount" style="display:none; text-align:center; color:var(--muted); font-size:12px;">0 / 5 photos</div>
 
       <button class="btn btn-primary" id="btnNext">NEXT →</button>
       <button class="btn btn-primary" id="btnOk" style="display:none">OK — LOOKS GOOD</button>
       <button class="btn btn-photo" id="btnPhoto" style="display:none">📷 UPLOAD IMAGE</button>
-      <input type="file" id="inputImage" accept="image/*" capture="environment" style="display:none" />
+      <input type="file" id="inputImage" accept="image/*" multiple style="display:none" />
       <button class="btn btn-harvest" id="btnHarvested" style="display:none">HARVESTED</button>
       <button class="btn btn-empty" id="btnEmpty">ROOM IS EMPTY</button>
       <button class="btn btn-issue" id="btnIssue">FLAG AN ISSUE</button>
@@ -452,9 +474,36 @@
   const tagCard = document.getElementById("tagCard");
   const btnPhoto = document.getElementById("btnPhoto");
   const inputImage = document.getElementById("inputImage");
-  const photoPreview = document.getElementById("photoPreview");
-  const photoThumb = document.getElementById("photoThumb");
+  const photoGrid = document.getElementById("photoGrid");
+  const photoCount = document.getElementById("photoCount");
   const roomJump = document.getElementById("roomJump");
+
+  const MAX_PHOTOS_PER_ROOM = 5;
+
+  // Compress an image File into a smaller JPEG (fits more in localStorage)
+  function compressImage(file, maxDim = 1024, quality = 0.7) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = e => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          let w = img.naturalWidth, h = img.naturalHeight;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL("image/jpeg", quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   // Populate jump-to-room dropdown
   (function populateJump() {
@@ -595,8 +644,8 @@
     btnHarvested.style.display = "none";
     btnOk.style.display        = "none";
     btnPhoto.style.display     = "none";
-    photoPreview.style.display = "none";
-    photoThumb.src             = "";
+    photoGrid.innerHTML        = "";
+    photoCount.style.display   = "none";
     inputImage.value           = "";
 
     if (isFlower) {
@@ -607,13 +656,8 @@
       inputTag.focus({ preventScroll: true });
       roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — pull one tag, enter last 6`;
     } else if (isVeg) {
-      btnPhoto.style.display = "flex";
       btnNext.style.display  = "flex";
-      btnNext.disabled = !(existing && existing.value === "PHOTO");
-      if (existing && existing.imgData) {
-        photoThumb.src = existing.imgData;
-        photoPreview.style.display = "block";
-      }
+      renderPhotoGrid();
       roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — snap a photo of the whiteboard`;
     } else {
       btnOk.style.display = "flex";
@@ -645,27 +689,77 @@
     }
   });
 
-  btnPhoto.addEventListener("click", () => inputImage.click());
-  inputImage.addEventListener("change", (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      const dataUrl = ev.target.result;
-      const r = ROOMS[state.idx];
-      const prev = state.results[r.name] || {};
-      // Cap image stored in localStorage size — keep thumb, mark photo taken
-      state.results[r.name] = { value: "PHOTO", issues: prev.issues || [], imgData: dataUrl, imgName: file.name || `${r.name}.jpg` };
-      try { saveState(); } catch (err) {
-        // localStorage quota — fall back to flagging photo taken without image
-        state.results[r.name] = { value: "PHOTO", issues: prev.issues || [], imgName: file.name || `${r.name}.jpg` };
-        try { saveState(); } catch (_) {}
+  function renderPhotoGrid() {
+    const r = ROOMS[state.idx];
+    const res = state.results[r.name] || {};
+    const images = res.images || [];
+    photoGrid.innerHTML = "";
+    images.forEach((img, i) => {
+      const tile = document.createElement("div");
+      tile.className = "photo-tile";
+      tile.innerHTML = `<img src="${img.dataUrl}" alt="photo ${i+1}"><button class="remove" data-idx="${i}" aria-label="remove">✕</button>`;
+      photoGrid.appendChild(tile);
+    });
+    photoCount.textContent = `${images.length} / ${MAX_PHOTOS_PER_ROOM} photos`;
+    photoCount.style.display = "block";
+    const atMax = images.length >= MAX_PHOTOS_PER_ROOM;
+    btnPhoto.style.display = atMax ? "none" : "flex";
+    btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD IMAGE" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+    btnNext.disabled = images.length === 0;
+  }
+
+  photoGrid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".remove");
+    if (!btn) return;
+    const r = ROOMS[state.idx];
+    const res = state.results[r.name] || { images: [] };
+    const i = parseInt(btn.dataset.idx, 10);
+    if (Number.isInteger(i)) {
+      res.images.splice(i, 1);
+      if (res.images.length === 0) {
+        // no photos left — clear PHOTO marker
+        delete state.results[r.name];
+      } else {
+        state.results[r.name] = res;
       }
-      photoThumb.src = dataUrl;
-      photoPreview.style.display = "block";
-      btnNext.disabled = false;
+      try { saveState(); } catch (_) {}
+      renderPhotoGrid();
+    }
+  });
+
+  btnPhoto.addEventListener("click", () => inputImage.click());
+  inputImage.addEventListener("change", async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const r = ROOMS[state.idx];
+    const prev = state.results[r.name] || { images: [], issues: [] };
+    const images = prev.images || [];
+    btnPhoto.disabled = true;
+    btnPhoto.textContent = "Processing…";
+    for (const file of files) {
+      if (images.length >= MAX_PHOTOS_PER_ROOM) break;
+      try {
+        const dataUrl = await compressImage(file);
+        images.push({ dataUrl, name: `${state.date}_${r.name}_${images.length + 1}.jpg` });
+      } catch (err) {
+        console.error("compress failed", err);
+      }
+    }
+    state.results[r.name] = {
+      value: "PHOTO",
+      issues: prev.issues || [],
+      images
     };
-    reader.readAsDataURL(file);
+    try { saveState(); } catch (err) {
+      // Quota — drop excess images one by one until it fits
+      while (state.results[r.name].images.length > 1) {
+        state.results[r.name].images.pop();
+        try { saveState(); break; } catch (_) {}
+      }
+    }
+    btnPhoto.disabled = false;
+    inputImage.value = "";
+    renderPhotoGrid();
   });
   btnEmpty.addEventListener("click", () => {
     saveRoom("EMPTY");
@@ -825,10 +919,10 @@
 
   // ---------- SUMMARY ----------
   function renderSummary() {
-    const photoCount = Object.values(state.results).filter(r => r && r.imgData).length;
+    const totalPhotos = Object.values(state.results).reduce((sum, r) => sum + ((r && r.images && r.images.length) || 0), 0);
     summaryHeader.innerHTML = `<strong>Date:</strong> ${state.date}<br/><strong>Initials:</strong> ${state.initials}` +
-      (photoCount ? `<br/><strong>Photos:</strong> ${photoCount} attached` : "");
-    btnSend.textContent = photoCount ? `SEND — ${photoCount} PHOTO${photoCount>1?"S":""} ATTACHED` : "EMAIL TO COMPLIANCE";
+      (totalPhotos ? `<br/><strong>Photos:</strong> ${totalPhotos} attached` : "");
+    btnSend.textContent = totalPhotos ? `SEND — ${totalPhotos} PHOTO${totalPhotos>1?"S":""} ATTACHED` : "EMAIL TO COMPLIANCE";
     summaryRooms.innerHTML = "";
     const ALL_ROOMS = ROOMS.concat(DRY_ROOMS.map(n => ({sec:"dry", name:n})));
     ALL_ROOMS.forEach(r => {
@@ -848,15 +942,18 @@
         val += ` ⚑ ${res.issues.join(", ")}`;
         cls = "val issue";
       }
-      const hasPhoto = !!(res && res.imgData);
-      if (hasPhoto) {
+      const photos = (res && res.images) || [];
+      if (photos.length) {
         li.className = "has-photo";
+        val = `📷 ${photos.length} photo${photos.length>1?"s":""}`;
+        cls = "val";
+        const strip = photos.map(p => `<img src="${p.dataUrl}" alt="${r.name}" />`).join("");
         li.innerHTML = `
           <div class="photo-row">
             <span class="room-label">${r.name}</span>
             <span class="${cls}">${val}</span>
           </div>
-          <img class="photo-thumb" src="${res.imgData}" alt="${r.name} photo" />
+          <div class="photo-strip">${strip}</div>
         `;
       } else {
         li.innerHTML = `<span class="room-label">${r.name}</span><span class="${cls}">${val}</span>`;
@@ -902,7 +999,7 @@
         if (res.value === "EMPTY") val = "EMPTY";
         else if (res.value === "HARVESTED") val = "HARVESTED";
         else if (res.value === "OK") val = "OK";
-        else if (res.value === "PHOTO") val = "PHOTO taken (attach to email)";
+        else if (res.value === "PHOTO") val = `${(res.images || []).length} photo(s) attached`;
         else if (/^\d+$/.test(res.value)) val = `tag ...${res.value}`;
         else if (res.value === "ISSUE") val = "ISSUE";
       }
@@ -940,11 +1037,14 @@
     const files = [];
     Object.keys(state.results).forEach(name => {
       const res = state.results[name];
-      if (res && res.imgData && res.imgData.startsWith("data:image")) {
-        const safeName = name.replace(/[^A-Za-z0-9_-]/g, "_");
-        const file = dataURLtoFile(res.imgData, `${state.date}_${safeName}.jpg`);
-        if (file) files.push(file);
-      }
+      const imgs = (res && res.images) || [];
+      const safeName = name.replace(/[^A-Za-z0-9_-]/g, "_");
+      imgs.forEach((img, i) => {
+        if (!img.dataUrl || !img.dataUrl.startsWith("data:image")) return;
+        const fname = img.name || `${state.date}_${safeName}_${i+1}.jpg`;
+        const f = dataURLtoFile(img.dataUrl, fname);
+        if (f) files.push(f);
+      });
     });
     return files;
   }
