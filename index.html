@@ -297,27 +297,6 @@
 
 
 
-    <!-- DRY ROOMS SCREEN (consolidated) -->
-    <section class="screen" id="screen-dry">
-      <div><span class="pill dry">DRY</span></div>
-      <h1 style="margin:0">Dry rooms</h1>
-      <p style="margin:0; color:var(--muted); font-size:14px;">For each, enter the last 6 of one package tag — or tap Empty.</p>
-      <div class="card" id="dryList"></div>
-      <button class="btn btn-primary" id="btnDryNext">NEXT →</button>
-    </section>
-
-    <!-- SANITATION SCREEN -->
-    <section class="screen" id="screen-sanitation">
-      <h1 style="margin:0">Sanitation & safety</h1>
-      <p style="margin:0; color:var(--muted); font-size:14px;">Tap each to confirm OK.</p>
-      <div class="card" id="sanitationList">
-        <div class="check-row" data-key="floors"><div class="box">✓</div><div class="label">Floors swept / debris removed</div></div>
-        <div class="check-row" data-key="doors"><div class="box">✓</div><div class="label">Flower room doors closed & locked</div></div>
-        <div class="check-row" data-key="dry"><div class="box">✓</div><div class="label">Drying room temp/RH within target</div></div>
-        <div class="check-row" data-key="irrig"><div class="box">✓</div><div class="label">Irrigation lines OK</div></div>
-      </div>
-      <button class="btn btn-primary" id="btnToWaste">NEXT →</button>
-    </section>
 
     <!-- WASTE SCREEN -->
     <section class="screen" id="screen-waste">
@@ -346,9 +325,8 @@
         <ul class="summary-list" id="summaryRooms"></ul>
       </div>
       <div class="card">
-        <h2>End of walk</h2>
-        <ul class="summary-list" id="summarySani"></ul>
-        <ul class="summary-list" id="summaryWaste" style="margin-top:8px"></ul>
+        <h2>Non-MMJ waste</h2>
+        <ul class="summary-list" id="summaryWaste"></ul>
       </div>
       <button class="btn btn-send" id="btnSend">📄 BUILD PDF & EMAIL</button>
       <div class="action-row">
@@ -376,8 +354,6 @@
     { sec: "veg",    name: "D"  }, { sec: "veg",    name: "E"  }, { sec: "veg",    name: "GH3" }, { sec: "veg",    name: "GH4" },
     { sec: "prop",   name: "F1" }, { sec: "prop",   name: "H"  }
   ];
-  // Dry rooms are handled in one consolidated screen
-  const DRY_ROOMS = ["F4","ctr16","ctr17","ctr18","Ctr19","Ctr20","Ctr21","Ctr22"];
 
   const SEC_LABEL = { flower: "FLOWER", veg: "VEG", prop: "PROP", dry: "DRY" };
 
@@ -392,7 +368,6 @@
       idx: -1,            // -1 = start screen; 0..ROOMS.length-1 = room idx; "sanitation" or "summary" handled separately
       stage: "start",     // start | room | sanitation | waste | summary
       results: {},        // room name -> { value: "1234" | "EMPTY" | "ISSUE", issues: [], }
-      sani: { floors: false, doors: false, dry: false, irrig: false },
       waste: { bags: 0 }
     };
   }
@@ -421,8 +396,6 @@
     pin: document.getElementById("screen-pin"),
     start: document.getElementById("screen-start"),
     room: document.getElementById("screen-room"),
-    dry: document.getElementById("screen-dry"),
-    sanitation: document.getElementById("screen-sanitation"),
     waste: document.getElementById("screen-waste"),
     summary: document.getElementById("screen-summary"),
   };
@@ -503,12 +476,10 @@
   });
 
 
-  const sanitationList = document.getElementById("sanitationList");
   const btnToSummary = document.getElementById("btnToSummary");
 
   const summaryHeader = document.getElementById("summaryHeader");
   const summaryRooms = document.getElementById("summaryRooms");
-  const summarySani  = document.getElementById("summarySani");
   const btnSend = document.getElementById("btnSend");
   const btnEditFromSummary = document.getElementById("btnEditFromSummary");
   const btnResetAll = document.getElementById("btnResetAll");
@@ -520,8 +491,6 @@
     if (stage === "pin") screens.pin.classList.add("active");
     else if (stage === "start") screens.start.classList.add("active");
     else if (stage === "room") screens.room.classList.add("active");
-    else if (stage === "dry") screens.dry.classList.add("active");
-    else if (stage === "sanitation") screens.sanitation.classList.add("active");
     else if (stage === "waste") screens.waste.classList.add("active");
     else if (stage === "summary") screens.summary.classList.add("active");
     updateProgress();
@@ -530,21 +499,17 @@
   }
 
   function updateProgress() {
-    const total = ROOMS.length + 4; // rooms + dry + sanitation + waste + summary
+    const total = ROOMS.length + 2; // rooms + waste + summary
     let done = 0;
     if (state.stage === "room") done = state.idx;
-    else if (state.stage === "dry") done = ROOMS.length;
-    else if (state.stage === "sanitation") done = ROOMS.length + 1;
-    else if (state.stage === "waste") done = ROOMS.length + 2;
-    else if (state.stage === "summary") done = ROOMS.length + 3;
+    else if (state.stage === "waste") done = ROOMS.length;
+    else if (state.stage === "summary") done = ROOMS.length + 1;
     progressBar.style.width = Math.max(0, Math.min(100, (done / total) * 100)) + "%";
   }
 
   function updateFooter() {
     if (state.stage === "start") footerInfo.textContent = "";
     else if (state.stage === "room") footerInfo.textContent = `${state.idx + 1} / ${ROOMS.length}`;
-    else if (state.stage === "dry") footerInfo.textContent = "Dry rooms";
-    else if (state.stage === "sanitation") footerInfo.textContent = "Sanitation";
     else if (state.stage === "waste") footerInfo.textContent = "Waste";
     else footerInfo.textContent = "Review";
     btnBack.style.visibility = (state.stage === "start" || state.stage === "pin") ? "hidden" : "visible";
@@ -779,8 +744,8 @@
 
   function advance() {
     if (state.idx + 1 >= ROOMS.length) {
-      renderDry();
-      show("dry");
+      renderWaste();
+      show("waste");
     } else {
       state.idx += 1;
       renderRoom();
@@ -789,74 +754,7 @@
   }
 
 
-  // ---------- SANITATION ----------
-  sanitationList.addEventListener("click", (e) => {
-    const row = e.target.closest(".check-row");
-    if (!row) return;
-    const key = row.dataset.key;
-    state.sani[key] = !state.sani[key];
-    row.classList.toggle("checked", state.sani[key]);
-    saveState();
-  });
-  function renderSanitation() {
-    [...sanitationList.children].forEach(r => {
-      r.classList.toggle("checked", !!state.sani[r.dataset.key]);
-    });
-  }
-  // ---------- DRY ROOMS (batch screen) ----------
-  const dryList = document.getElementById("dryList");
-  const btnDryNext = document.getElementById("btnDryNext");
-
-  function renderDry() {
-    dryList.innerHTML = "";
-    DRY_ROOMS.forEach(name => {
-      const existing = state.results[name] || {};
-      const row = document.createElement("div");
-      row.className = "dry-row" + (existing.value === "EMPTY" ? " is-empty" : "");
-      row.innerHTML = `
-        <div class="name">${name}</div>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
-               placeholder="000000" data-room="${name}"
-               value="${(existing.value && /^\d+$/.test(existing.value)) ? existing.value : ""}"
-               ${existing.value === "EMPTY" ? "disabled" : ""} />
-        <button class="empty-toggle" data-room="${name}">EMPTY</button>
-      `;
-      dryList.appendChild(row);
-    });
-  }
-
-  dryList.addEventListener("input", (e) => {
-    const inp = e.target;
-    if (inp.tagName !== "INPUT") return;
-    inp.value = inp.value.replace(/\D/g, "").slice(0, 6);
-    const name = inp.dataset.room;
-    const prev = state.results[name] || {};
-    state.results[name] = { value: inp.value, issues: prev.issues || [] };
-    saveState();
-  });
-  dryList.addEventListener("click", (e) => {
-    if (!e.target.classList.contains("empty-toggle")) return;
-    const name = e.target.dataset.room;
-    const row = e.target.closest(".dry-row");
-    const input = row.querySelector("input");
-    const prev = state.results[name] || {};
-    if (prev.value === "EMPTY") {
-      state.results[name] = { value: "", issues: prev.issues || [] };
-      row.classList.remove("is-empty");
-      input.disabled = false;
-      input.value = "";
-    } else {
-      state.results[name] = { value: "EMPTY", issues: prev.issues || [] };
-      row.classList.add("is-empty");
-      input.disabled = true;
-      input.value = "";
-    }
-    saveState();
-  });
-  btnDryNext.addEventListener("click", () => { show("sanitation"); });
-
   // ---------- WASTE ----------
-  const btnToWaste = document.getElementById("btnToWaste");
   const bagsMinus = document.getElementById("bagsMinus");
   const bagsPlus  = document.getElementById("bagsPlus");
   const bagNum    = document.getElementById("bagNum");
@@ -866,7 +764,6 @@
     bagNum.textContent = state.waste.bags;
     bagsMinus.disabled = state.waste.bags <= 0;
   }
-  btnToWaste.addEventListener("click", () => { renderWaste(); show("waste"); });
   bagsMinus.addEventListener("click", () => {
     state.waste.bags = Math.max(0, (state.waste.bags || 0) - 1);
     renderWaste(); saveState();
@@ -888,8 +785,7 @@
       (totalPhotos ? `<br/><strong>Photos:</strong> ${totalPhotos} attached` : "");
     btnSend.textContent = totalPhotos ? `📄 BUILD PDF — ${totalPhotos} PHOTO${totalPhotos>1?"S":""}` : "📄 BUILD PDF & EMAIL";
     summaryRooms.innerHTML = "";
-    const ALL_ROOMS = ROOMS.concat(DRY_ROOMS.map(n => ({sec:"dry", name:n})));
-    ALL_ROOMS.forEach(r => {
+    ROOMS.forEach(r => {
       const res = state.results[r.name];
       const li = document.createElement("li");
       let val = "—";
@@ -927,15 +823,6 @@
       }
       summaryRooms.appendChild(li);
     });
-    summarySani.innerHTML = "";
-    const SANI_LABELS = {
-      floors: "Floors swept", doors: "Doors locked", dry: "Dry room temp/RH", irrig: "Irrigation OK"
-    };
-    Object.entries(state.sani).forEach(([k, v]) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span class="room-label">${SANI_LABELS[k]}</span><span class="val ${v ? '' : 'issue'}">${v ? "OK" : "—"}</span>`;
-      summarySani.appendChild(li);
-    });
     // Waste
     const summaryWaste = document.getElementById("summaryWaste");
     summaryWaste.innerHTML = "";
@@ -953,8 +840,7 @@
     lines.push(`Recorded by: ${state.initials}`);
     lines.push("");
     let lastSec = "";
-    const ALL_ROOMS = ROOMS.concat(DRY_ROOMS.map(n => ({sec:"dry", name:n})));
-    ALL_ROOMS.forEach(r => {
+    ROOMS.forEach(r => {
       if (r.sec !== lastSec) {
         lines.push("");
         lines.push(`-- ${SEC_LABEL[r.sec]} --`);
@@ -971,12 +857,6 @@
         else if (res.value === "ISSUE") val = "ISSUE";
       }
       lines.push(`  ${r.name.padEnd(6, " ")} ${val}`);
-    });
-    lines.push("");
-    lines.push(`-- SANITATION --`);
-    const SANI_LABELS = { floors: "Floors swept", doors: "Doors locked", dry: "Dry temp/RH", irrig: "Irrigation OK" };
-    Object.entries(state.sani).forEach(([k, v]) => {
-      lines.push(`  ${SANI_LABELS[k]}: ${v ? "OK" : "—"}`);
     });
     lines.push("");
     lines.push(`-- NON-MMJ WASTE --`);
@@ -1094,24 +974,6 @@
     y = sectionTable("FLOWER", ROOMS.filter(r => r.sec === "flower").map(r => r.name), y) + 14;
     y = sectionTable("VEG", ROOMS.filter(r => r.sec === "veg").map(r => r.name), y) + 14;
     y = sectionTable("PROP", ROOMS.filter(r => r.sec === "prop").map(r => r.name), y) + 14;
-
-    if (y > H - 250) { doc.addPage(); drawHeader(true); y = 56; }
-    y = sectionTable("DRY", DRY_ROOMS, y) + 14;
-
-    // Sanitation
-    if (y > H - 180) { doc.addPage(); drawHeader(true); y = 56; }
-    const SANI_LABELS = { floors: "Floors swept", doors: "Doors locked", dry: "Dry temp/RH", irrig: "Irrigation OK" };
-    doc.autoTable({
-      head: [["SANITATION & SAFETY", "Status"]],
-      body: Object.entries(state.sani).map(([k, v]) => [SANI_LABELS[k], v ? "OK" : "—"]),
-      startY: y,
-      theme: "striped",
-      headStyles: { fillColor: [31, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
-      bodyStyles: { fontSize: 10, cellPadding: 5 },
-      margin: { left: M, right: M },
-      columnStyles: { 0: { fontStyle: "bold" } }
-    });
-    y = doc.lastAutoTable.finalY + 14;
 
     // Waste
     if (y > H - 120) { doc.addPage(); drawHeader(true); y = 56; }
@@ -1243,12 +1105,8 @@
     if (state.stage === "room") {
       if (state.idx > 0) { state.idx -= 1; renderRoom(); show("room"); }
       else { show("start"); }
-    } else if (state.stage === "dry") {
-      state.idx = ROOMS.length - 1; renderRoom(); show("room");
-    } else if (state.stage === "sanitation") {
-      renderDry(); show("dry");
     } else if (state.stage === "waste") {
-      renderSanitation(); show("sanitation");
+      state.idx = ROOMS.length - 1; renderRoom(); show("room");
     } else if (state.stage === "summary") {
       renderWaste(); show("waste");
     }
@@ -1265,7 +1123,6 @@
     if (inputPin.value === PIN_CODE) {
       localStorage.setItem(PIN_UNLOCK_KEY, "1");
       renderStart();
-      renderSanitation();
       state.stage = "start";
       show("start");
     } else {
@@ -1284,7 +1141,6 @@
   // ---------- INIT ----------
   if (localStorage.getItem(PIN_UNLOCK_KEY) === "1") {
     renderStart();
-    renderSanitation();
     state.stage = "start";
     show("start");
   } else {
