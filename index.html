@@ -589,6 +589,7 @@
       roomSub.textContent = "Photo of the whiteboard";
     } else {
       btnOk.style.display = "flex";
+      renderPhotoGrid(); // optional whiteboard photo for prop too
       roomSub.textContent = "Confirm status";
     }
   }
@@ -1002,8 +1003,8 @@
     doc.text(`Date: ${state.date}`, M + 260, y + 22);
     doc.setTextColor(0);
 
-    // ---- PHOTO PAGES ----
-    for (const r of ROOMS.filter(rr => rr.sec === "veg")) {
+    // ---- PHOTO PAGES (any room with images) ----
+    for (const r of ROOMS) {
       const photos = (state.results[r.name]?.images) || [];
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
