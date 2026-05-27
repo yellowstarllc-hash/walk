@@ -71,10 +71,10 @@
   .pill.prop { background: #9333ea; }
   .pill.dry { background: #b45309; }
   .room-name {
-    font-size: 48px; font-weight: 800; color: var(--navy);
-    text-align: center; letter-spacing: 1px; margin: 10px 0 0;
+    font-size: 52px; font-weight: 800; color: var(--navy);
+    text-align: center; letter-spacing: 1px; margin: 4px 0 0;
   }
-  .room-sub { text-align: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .room-sub { text-align: center; color: var(--muted); font-size: 12px; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
 
   .tag-input {
     font-size: 32px !important; text-align: center; letter-spacing: 4px;
@@ -89,6 +89,9 @@
     font-size: 18px; font-weight: 700; border: none;
     cursor: pointer; transition: transform 0.08s ease, opacity 0.15s;
   }
+  .btn-sm { padding: 12px; font-size: 14px; }
+  .action-row { display: flex; gap: 8px; }
+  .action-row > .btn { flex: 1; }
   .btn:active { transform: scale(0.97); }
   .btn-primary { background: var(--navy); color: #fff; }
   .btn-harvest { background: #b45309; color: #fff; }
@@ -213,21 +216,14 @@
     letter-spacing: 1px; margin-top: 4px;
   }
   .jump-bar {
-    display: flex; align-items: center; gap: 10px;
-    background: #fff; border: 1px solid var(--line); border-radius: 10px;
-    padding: 10px 12px;
-  }
-  .jump-bar label {
-    font-size: 11px; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.5px; margin: 0; font-weight: 600; flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
   }
   .jump-bar select {
-    flex: 1; font-size: 16px; padding: 8px 10px; border-radius: 8px;
-    border: 1px solid var(--line); background: #fff; color: var(--text);
+    flex: 1; font-size: 13px; padding: 6px 28px 6px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: var(--muted);
     -webkit-appearance: none; appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%231f3a5f' d='M0 0l6 8 6-8z'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%236b7280' d='M0 0l5 6 5-6z'/></svg>");
     background-repeat: no-repeat; background-position: right 10px center;
-    padding-right: 28px;
   }
   footer {
     padding: 12px 16px; background: #fff; border-top: 1px solid var(--line);
@@ -275,31 +271,29 @@
     <!-- ROOM SCREEN (one per room, rendered dynamically) -->
     <section class="screen" id="screen-room">
       <div class="jump-bar">
-        <label for="roomJump">JUMP TO ROOM</label>
         <select id="roomJump"></select>
       </div>
-      <div>
-        <span class="pill" id="roomPill">FLOWER</span>
-      </div>
       <div class="room-name" id="roomName">A1</div>
-      <div class="room-sub" id="roomSub">Pull one tag — enter the last 6 digits</div>
+      <div class="room-sub" id="roomSub">Pull a tag · last 6</div>
 
       <div class="card" id="tagCard">
-        <label>Last 6 of pulled tag</label>
         <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6"
                class="tag-input" id="inputTag" placeholder="000000" />
       </div>
 
       <div id="photoGrid" class="photo-grid"></div>
-      <div id="photoCount" style="display:none; text-align:center; color:var(--muted); font-size:12px;">0 / 5 photos</div>
+      <div id="photoCount" style="display:none; text-align:center; color:var(--muted); font-size:11px; margin-top:-6px;">0 / 5</div>
 
       <button class="btn btn-primary" id="btnNext">NEXT →</button>
-      <button class="btn btn-primary" id="btnOk" style="display:none">OK — LOOKS GOOD</button>
-      <button class="btn btn-photo" id="btnPhoto" style="display:none">📷 UPLOAD IMAGE</button>
+      <button class="btn btn-primary" id="btnOk" style="display:none">OK</button>
+      <button class="btn btn-photo" id="btnPhoto" style="display:none">📷 ADD PHOTO</button>
       <input type="file" id="inputImage" accept="image/*" multiple style="display:none" />
-      <button class="btn btn-harvest" id="btnHarvested" style="display:none">HARVESTED</button>
-      <button class="btn btn-empty" id="btnEmpty">ROOM IS EMPTY</button>
-      <button class="btn btn-issue" id="btnIssue">FLAG AN ISSUE</button>
+
+      <div class="action-row" id="actionRow">
+        <button class="btn btn-empty btn-sm" id="btnEmpty">EMPTY</button>
+        <button class="btn btn-harvest btn-sm" id="btnHarvested" style="display:none">HARVESTED</button>
+        <button class="btn btn-issue btn-sm" id="btnIssue">FLAG</button>
+      </div>
     </section>
 
     <!-- ISSUE PICKER -->
@@ -308,13 +302,10 @@
         <h1 id="issueRoom">A1 — flag issue</h1>
         <p style="margin:0 0 14px; color:var(--muted); font-size:14px;">Tap the issue. You can pick more than one.</p>
         <div class="chips" id="issueChips">
-          <div class="chip" data-issue="tag mismatch">Tag mismatch vs door</div>
-          <div class="chip" data-issue="door blank">Door whiteboard blank</div>
+          <div class="chip" data-issue="tag mismatch">Tag mismatch</div>
           <div class="chip" data-issue="pests">Pests</div>
-          <div class="chip" data-issue="irrigation">Irrigation issue</div>
-          <div class="chip" data-issue="debris">Debris on floor</div>
-          <div class="chip" data-issue="light/temp">Light or temp off</div>
-          <div class="chip" data-issue="needs RFID scan">Needs RFID scan</div>
+          <div class="chip" data-issue="irrigation">Irrigation</div>
+          <div class="chip" data-issue="debris">Debris</div>
           <div class="chip" data-issue="other">Other</div>
         </div>
       </div>
@@ -371,17 +362,15 @@
         <ul class="summary-list" id="summaryRooms"></ul>
       </div>
       <div class="card">
-        <h2>Sanitation</h2>
+        <h2>End of walk</h2>
         <ul class="summary-list" id="summarySani"></ul>
+        <ul class="summary-list" id="summaryWaste" style="margin-top:8px"></ul>
       </div>
-      <div class="card">
-        <h2>Non-MMJ waste</h2>
-        <ul class="summary-list" id="summaryWaste"></ul>
+      <button class="btn btn-send" id="btnSend">📄 BUILD PDF & EMAIL</button>
+      <div class="action-row">
+        <button class="btn btn-ghost btn-sm" id="btnEditFromSummary">Back to edit</button>
+        <button class="btn btn-ghost btn-sm" id="btnResetAll" style="color:var(--warn)">Discard</button>
       </div>
-      <button class="btn btn-send" id="btnSend">EMAIL TO COMPLIANCE</button>
-      <button class="btn btn-ghost" id="btnCopy">Copy text instead</button>
-      <button class="btn btn-back" id="btnEditFromSummary">Back to edit</button>
-      <button class="btn btn-back" id="btnResetAll" style="color:var(--warn)">Discard & start over</button>
     </section>
   </main>
 
@@ -464,7 +453,6 @@
   const footerInfo = document.getElementById("footerInfo");
   const btnBack = document.getElementById("btnBack");
 
-  const roomPill = document.getElementById("roomPill");
   const roomName = document.getElementById("roomName");
   const roomSub  = document.getElementById("roomSub");
   const inputTag = document.getElementById("inputTag");
@@ -546,7 +534,6 @@
   const summaryRooms = document.getElementById("summaryRooms");
   const summarySani  = document.getElementById("summarySani");
   const btnSend = document.getElementById("btnSend");
-  const btnCopy = document.getElementById("btnCopy");
   const btnEditFromSummary = document.getElementById("btnEditFromSummary");
   const btnResetAll = document.getElementById("btnResetAll");
 
@@ -634,8 +621,6 @@
   function renderRoom() {
     const r = ROOMS[state.idx];
     roomJump.value = state.idx;
-    roomPill.textContent = SEC_LABEL[r.sec];
-    roomPill.className = "pill " + r.sec;
     roomName.textContent = r.name;
     const existing = state.results[r.name];
     const isFlower = (r.sec === "flower");
@@ -656,14 +641,14 @@
       btnHarvested.style.display = "flex";
       inputTag.value = (existing && /^\d+$/.test(existing.value)) ? existing.value : "";
       inputTag.focus({ preventScroll: true });
-      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — pull one tag, enter last 6`;
+      roomSub.textContent = "Pull a tag · last 6";
     } else if (isVeg) {
       btnNext.style.display  = "flex";
       renderPhotoGrid();
-      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — snap a photo of the whiteboard`;
+      roomSub.textContent = "Photo of the whiteboard";
     } else {
       btnOk.style.display = "flex";
-      roomSub.textContent = `${state.idx + 1} of ${ROOMS.length} — confirm status`;
+      roomSub.textContent = "Confirm status";
     }
   }
 
@@ -1080,54 +1065,58 @@
 
     function drawHeader(small) {
       doc.setFillColor(31, 58, 95);
-      doc.rect(0, 0, W, small ? 50 : 72, "F");
+      doc.rect(0, 0, W, small ? 36 : 60, "F");
       doc.setTextColor(255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(small ? 14 : 20);
-      doc.text("DAILY WALK LOG", M, small ? 22 : 32);
+      doc.setFontSize(small ? 12 : 18);
+      doc.text("DAILY WALK LOG", M, small ? 18 : 28);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text("Yellow Star LLC | License GAAI-QI5G-DEQQ", M, small ? 38 : 50);
+      doc.setFontSize(8);
+      doc.text("Yellow Star LLC · GAAI-QI5G-DEQQ", M, small ? 30 : 44);
       if (!small) {
-        doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
-        doc.text(`Date: ${state.date}`, M, 65);
-        doc.text(`Recorded by: ${state.initials}`, M + 200, 65);
+        doc.setFontSize(10);
+        doc.text(`${state.date} · ${state.initials}`, W - M, 28, { align: "right" });
       }
       doc.setTextColor(0);
     }
 
-    function sectionTable(label, rooms, startY, opts={}) {
+    function sectionTable(label, rooms, startY) {
+      const hasIssues = rooms.some(name => (state.results[name]?.issues || []).length > 0);
+      const head = hasIssues ? [[label, "Result", "Issues"]] : [[label, "Result"]];
       const body = rooms.map(name => {
         const res = state.results[name];
-        return [name, fmtResultForPDF(res), (res?.issues || []).join(", ") || ""];
+        const row = [name, fmtResultForPDF(res)];
+        if (hasIssues) row.push((res?.issues || []).join(", "));
+        return row;
       });
+      const columnStyles = hasIssues
+        ? { 0: { cellWidth: 70, fontStyle: "bold" }, 1: { cellWidth: 160 }, 2: { cellWidth: "auto" } }
+        : { 0: { cellWidth: 100, fontStyle: "bold" }, 1: { cellWidth: "auto" } };
       doc.autoTable({
-        head: [[label, "Result", "Issues"]],
-        body,
-        startY,
+        head, body, startY,
         theme: "striped",
-        headStyles: { fillColor: [31, 58, 95], textColor: 255, fontSize: 10, fontStyle: "bold" },
-        bodyStyles: { fontSize: 10, cellPadding: 5 },
+        headStyles: { fillColor: [31, 58, 95], textColor: 255, fontSize: 9, fontStyle: "bold" },
+        bodyStyles: { fontSize: 9, cellPadding: 4 },
         margin: { left: M, right: M },
-        columnStyles: { 0: { cellWidth: 80, fontStyle: "bold" }, 1: { cellWidth: 180 }, 2: { cellWidth: "auto" } }
+        columnStyles
       });
       return doc.lastAutoTable.finalY;
     }
 
     // ---- PAGE 1: header + tables + sanitation + waste ----
     drawHeader();
-    let y = 90;
+    let y = 76;
 
     y = sectionTable("FLOWER", ROOMS.filter(r => r.sec === "flower").map(r => r.name), y) + 14;
     y = sectionTable("VEG", ROOMS.filter(r => r.sec === "veg").map(r => r.name), y) + 14;
     y = sectionTable("PROP", ROOMS.filter(r => r.sec === "prop").map(r => r.name), y) + 14;
 
-    if (y > H - 250) { doc.addPage(); drawHeader(true); y = 70; }
+    if (y > H - 250) { doc.addPage(); drawHeader(true); y = 56; }
     y = sectionTable("DRY", DRY_ROOMS, y) + 14;
 
     // Sanitation
-    if (y > H - 180) { doc.addPage(); drawHeader(true); y = 70; }
+    if (y > H - 180) { doc.addPage(); drawHeader(true); y = 56; }
     const SANI_LABELS = { floors: "Floors swept", doors: "Doors locked", dry: "Dry temp/RH", irrig: "Irrigation OK" };
     doc.autoTable({
       head: [["SANITATION & SAFETY", "Status"]],
@@ -1142,7 +1131,7 @@
     y = doc.lastAutoTable.finalY + 14;
 
     // Waste
-    if (y > H - 120) { doc.addPage(); drawHeader(true); y = 70; }
+    if (y > H - 120) { doc.addPage(); drawHeader(true); y = 56; }
     doc.autoTable({
       head: [["NON-MMJ WASTE", "Count"]],
       body: [["Bags out today", String((state.waste && state.waste.bags) || 0)]],
@@ -1176,16 +1165,16 @@
         doc.addPage();
         drawHeader(true);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.text(`${r.name} — photo ${i + 1} of ${photos.length}`, M, 72);
+        doc.setFontSize(12);
+        doc.text(`${r.name} — photo ${i + 1} of ${photos.length}`, M, 56);
 
         const dims = await getImageDims(photo.dataUrl);
         const availW = W - 2 * M;
-        const availH = H - 100 - M;
+        const availH = H - 90 - M;
         let drawW = availW, drawH = drawW * dims.h / dims.w;
         if (drawH > availH) { drawH = availH; drawW = drawH * dims.w / dims.h; }
         const x = M + (availW - drawW) / 2;
-        try { doc.addImage(photo.dataUrl, "JPEG", x, 90, drawW, drawH); }
+        try { doc.addImage(photo.dataUrl, "JPEG", x, 72, drawW, drawH); }
         catch (e) { console.error("addImage failed", e); }
       }
     }
@@ -1257,16 +1246,6 @@
     renderSummary();
   }
   btnSend.addEventListener("click", sendWalk);
-  btnCopy.addEventListener("click", async () => {
-    const text = `Subject: ${buildSubject()}\n\n${buildEmailBody()}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      btnCopy.textContent = "Copied ✓";
-      setTimeout(() => btnCopy.textContent = "Copy text instead", 1500);
-    } catch (e) {
-      alert("Couldn't copy — long press the screen and select all from the summary above.");
-    }
-  });
   btnEditFromSummary.addEventListener("click", () => { state.idx = 0; renderRoom(); show("room"); });
   btnResetAll.addEventListener("click", () => {
     if (!confirm("Discard this walk and start over?")) return;
