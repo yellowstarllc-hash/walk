@@ -357,6 +357,54 @@
 
   const SEC_LABEL = { flower: "FLOWER", veg: "VEG", prop: "PROP", dry: "DRY" };
 
+  // ---------- PHOTO STORAGE (IndexedDB — localStorage caps at ~5MB on iOS) ----------
+  const IDB_NAME = "yellowstar_walk_photos";
+  const IDB_STORE = "photos";
+  let _dbPromise = null;
+  function openPhotoDB() {
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return _dbPromise;
+  }
+  function idbPut(key, val) {
+    return openPhotoDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(val, key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+  function idbGet(key) {
+    return openPhotoDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const r = tx.objectStore(IDB_STORE).get(key);
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    }));
+  }
+  function idbDelete(key) {
+    return openPhotoDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+  function idbClear() {
+    return openPhotoDB().then(db => new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    }));
+  }
+  function photoKey(roomName, photoId) { return `${roomName}|${photoId}`; }
+
   // ---------- STATE ----------
   const STORAGE_KEY = "yellowstar_walk_v1";
   let state = loadState() || initState();
@@ -379,11 +427,33 @@
       return s;
     } catch (e) { return null; }
   }
+  // Strip heavy image dataUrls before persisting — they live in IndexedDB.
   function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      const lite = JSON.parse(JSON.stringify(state));
+      if (lite.results) {
+        for (const k in lite.results) {
+          const imgs = lite.results[k].images || [];
+          lite.results[k].images = imgs.map(img => ({ name: img.name, id: img.id }));
+        }
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(lite));
+    } catch (e) {
+      console.error("saveState failed", e);
+    }
   }
   function clearState() {
     localStorage.removeItem(STORAGE_KEY);
+    idbClear().catch(()=>{});
+  }
+  // Resolve a photo's dataUrl on demand (from memory if present, else IDB).
+  async function getPhotoDataUrl(roomName, img) {
+    if (img.dataUrl) return img.dataUrl;
+    if (img.id) {
+      try { return await idbGet(photoKey(roomName, img.id)); }
+      catch (e) { console.error("idbGet failed", e); return null; }
+    }
+    return null;
   }
   function todayISO() {
     const d = new Date();
@@ -421,10 +491,15 @@
   const photoCount = document.getElementById("photoCount");
   const roomJump = document.getElementById("roomJump");
 
-  const MAX_PHOTOS_PER_ROOM = 5;
+  // Per-room photo limit (F1 prop room needs more for clone batch documentation)
+  const PHOTO_LIMITS = { F1: 10 };
+  const DEFAULT_PHOTO_LIMIT = 5;
+  function maxPhotosFor(roomName) {
+    return PHOTO_LIMITS[roomName] || DEFAULT_PHOTO_LIMIT;
+  }
 
-  // Compress an image File into a smaller JPEG (fits more in localStorage)
-  function compressImage(file, maxDim = 1024, quality = 0.7) {
+  // Compress an image File into a smaller JPEG (smaller = fits more in localStorage)
+  function compressImage(file, maxDim = 800, quality = 0.55) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = reject;
@@ -527,6 +602,7 @@
     try {
       let initials = (inputInitials.value || "").trim().toUpperCase();
       if (!initials) initials = "JB";
+      idbClear().catch(()=>{}); // fresh walk = fresh photo store
       state = initState();
       state.date = inputDate.value || todayISO();
       state.initials = initials;
@@ -628,8 +704,19 @@
     }
   });
 
-  function renderPhotoGrid() {
+  async function hydrateImages(roomName) {
+    const res = state.results[roomName];
+    if (!res || !res.images) return;
+    for (const img of res.images) {
+      if (!img.dataUrl && img.id) {
+        try { img.dataUrl = await idbGet(photoKey(roomName, img.id)); } catch (_) {}
+      }
+    }
+  }
+
+  async function renderPhotoGrid() {
     const r = ROOMS[state.idx];
+    await hydrateImages(r.name);
     const res = state.results[r.name] || {};
     const images = res.images || [];
     const isVeg = r.sec === "veg";
@@ -641,18 +728,18 @@
       photoGrid.appendChild(tile);
     });
     if (images.length) {
-      photoCount.textContent = `${images.length} / ${MAX_PHOTOS_PER_ROOM} photos`;
+      photoCount.textContent = `${images.length} / ${maxPhotosFor(r.name)} photos`;
       photoCount.style.display = "block";
     } else {
       photoCount.style.display = "none";
     }
-    const atMax = images.length >= MAX_PHOTOS_PER_ROOM;
+    const atMax = images.length >= maxPhotosFor(r.name);
     btnPhoto.style.display = atMax ? "none" : "flex";
     if (isVeg) {
-      btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD WHITEBOARD" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+      btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD WHITEBOARD" : `📷 ADD ANOTHER (${images.length}/${maxPhotosFor(r.name)})`;
       btnNext.disabled = images.length === 0;
     } else {
-      btnPhoto.textContent = images.length === 0 ? "📷 WHITEBOARD PHOTO" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+      btnPhoto.textContent = images.length === 0 ? "📷 WHITEBOARD PHOTO" : `📷 ADD ANOTHER (${images.length}/${maxPhotosFor(r.name)})`;
       btnNext.disabled = false; // flower: photo is optional
     }
   }
@@ -664,7 +751,8 @@
     const res = state.results[r.name] || { images: [] };
     const i = parseInt(btn.dataset.idx, 10);
     if (Number.isInteger(i)) {
-      res.images.splice(i, 1);
+      const removed = res.images.splice(i, 1)[0];
+      if (removed && removed.id) idbDelete(photoKey(r.name, removed.id)).catch(()=>{});
       if (res.images.length === 0) {
         // no photos left — clear PHOTO marker
         delete state.results[r.name];
@@ -685,13 +773,17 @@
     const images = prev.images || [];
     btnPhoto.disabled = true;
     btnPhoto.textContent = "Processing…";
+    let failed = 0;
     for (const file of files) {
-      if (images.length >= MAX_PHOTOS_PER_ROOM) break;
+      if (images.length >= maxPhotosFor(r.name)) break;
       try {
         const dataUrl = await compressImage(file);
-        images.push({ dataUrl, name: `${state.date}_${r.name}_${images.length + 1}.jpg` });
+        const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        await idbPut(photoKey(r.name, id), dataUrl);
+        images.push({ dataUrl, id, name: `${state.date}_${r.name}_${images.length + 1}.jpg` });
       } catch (err) {
-        console.error("compress failed", err);
+        console.error("photo save failed", err);
+        failed++;
       }
     }
     state.results[r.name] = {
@@ -699,16 +791,11 @@
       issues: prev.issues || [],
       images
     };
-    try { saveState(); } catch (err) {
-      // Quota — drop excess images one by one until it fits
-      while (state.results[r.name].images.length > 1) {
-        state.results[r.name].images.pop();
-        try { saveState(); break; } catch (_) {}
-      }
-    }
+    saveState();
     btnPhoto.disabled = false;
     inputImage.value = "";
     renderPhotoGrid();
+    if (failed) alert(`${failed} photo${failed>1?"s":""} couldn't be saved — try a smaller picture.`);
   });
   btnEmpty.addEventListener("click", () => {
     saveRoom("EMPTY");
@@ -780,7 +867,14 @@
   });
 
   // ---------- SUMMARY ----------
-  function renderSummary() {
+  async function hydrateAll() {
+    for (const r of ROOMS) await hydrateImages(r.name);
+  }
+  async function renderSummary() {
+    await hydrateAll();
+    renderSummarySync();
+  }
+  function renderSummarySync() {
     const totalPhotos = Object.values(state.results).reduce((sum, r) => sum + ((r && r.images && r.images.length) || 0), 0);
     summaryHeader.innerHTML = `<strong>Date:</strong> ${state.date}<br/><strong>Initials:</strong> ${state.initials}` +
       (totalPhotos ? `<br/><strong>Photos:</strong> ${totalPhotos} attached` : "");
@@ -923,6 +1017,7 @@
 
   async function buildPDF() {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("PDF library not loaded — check internet connection.");
+    await hydrateAll();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const W = 612, H = 792, M = 40;
@@ -1138,6 +1233,14 @@
     if (inputPin.value.length === 4) tryUnlock();
   });
   btnPin.addEventListener("click", tryUnlock);
+
+  // ---------- SERVICE WORKER (offline cache) ----------
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js")
+        .catch(err => console.warn("SW register failed:", err));
+    });
+  }
 
   // ---------- INIT ----------
   if (localStorage.getItem(PIN_UNLOCK_KEY) === "1") {
