@@ -502,10 +502,6 @@
     }
   });
 
-  const issueRoom = document.getElementById("issueRoom");
-  const issueChips = document.getElementById("issueChips");
-  const btnSaveIssue = document.getElementById("btnSaveIssue");
-  const btnCancelIssue = document.getElementById("btnCancelIssue");
 
   const sanitationList = document.getElementById("sanitationList");
   const btnToSummary = document.getElementById("btnToSummary");
@@ -974,7 +970,6 @@
         else if (/^\d+$/.test(res.value)) val = `tag ...${res.value}`;
         else if (res.value === "ISSUE") val = "ISSUE";
       }
-      if (res?.issues?.length) val += ` | flags: ${res.issues.join(", ")}`;
       lines.push(`  ${r.name.padEnd(6, " ")} ${val}`);
     });
     lines.push("");
