@@ -686,7 +686,7 @@
       btnPhoto.textContent = images.length === 0 ? "📷 UPLOAD WHITEBOARD" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
       btnNext.disabled = images.length === 0;
     } else {
-      btnPhoto.textContent = images.length === 0 ? "📷 WHITEBOARD PHOTO (optional)" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
+      btnPhoto.textContent = images.length === 0 ? "📷 WHITEBOARD PHOTO" : `📷 ADD ANOTHER (${images.length}/${MAX_PHOTOS_PER_ROOM})`;
       btnNext.disabled = false; // flower: photo is optional
     }
   }
